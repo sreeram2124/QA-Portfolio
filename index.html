@@ -1,0 +1,1805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Wildfire & Air Quality Monitor</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css">
+    <style>
+        :root {
+            --primary-color: #3b82f6;
+            --primary-hover: #2563eb;
+            --accent-color: #f59e0b;
+            --accent-hover: #d97706;
+            --danger-color: #ef4444;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --info-color: #3b82f6;
+        }
+
+        .dark {
+            --bg-primary: #111827;
+            --bg-secondary: #1f2937;
+            --text-primary: #f9fafb;
+            --text-secondary: #e5e7eb;
+            --border-color: #374151;
+        }
+
+        .light {
+            --bg-primary: #f9fafb;
+            --bg-secondary: #f3f4f6;
+            --text-primary: #111827;
+            --text-secondary: #4b5563;
+            --border-color: #e5e7eb;
+        }
+        
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        #map {
+            height: 70vh;
+            width: 100%;
+            border-radius: 0.5rem;
+            z-index: 1;
+            transition: all 0.3s ease;
+        }
+
+        .dashboard-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .function-button {
+            transition: all 0.3s ease;
+            transform: translateY(0);
+        }
+        
+        .function-button:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .data-point {
+            transition: all 0.5s ease;
+        }
+
+        .data-point:hover {
+            transform: scale(1.05);
+        }
+
+        .search-container {
+            position: relative;
+            z-index: 10;
+        }
+
+        .search-results {
+            position: absolute;
+            width: 100%;
+            max-height: 200px;
+            overflow-y: auto;
+            top: 100%;
+            left: 0;
+            z-index: 20;
+        }
+
+        .leaflet-popup-content {
+            min-width: 200px;
+        }
+
+        /* Custom animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translate3d(0, 30px, 0);
+            }
+            to {
+                opacity: 1;
+                transform: translate3d(0, 0, 0);
+            }
+        }
+
+        @keyframes pulseGlow {
+            0% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            }
+        }
+
+        .fade-in-up {
+            animation: fadeInUp 0.5s ease forwards;
+        }
+
+        .pulse-glow {
+            animation: pulseGlow 1.5s infinite;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: var(--primary-color);
+            animation: spin 1s infinite linear;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Chart animations */
+        .chart-container {
+            transition: all 0.5s ease;
+        }
+
+        .chart-container:hover {
+            transform: translateY(-5px);
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--primary-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-hover);
+        }
+
+        /* Map marker customizations */
+        .wildfire-marker {
+            border-radius: 50%;
+            width: 10px;
+            height: 10px;
+            background-color: var(--danger-color);
+            border: 2px solid white;
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+        }
+
+        .air-quality-marker {
+            border-radius: 50%;
+            width: 12px;
+            height: 12px;
+            border: 2px solid white;
+            position: relative;
+        }
+
+        .aqi-good {
+            background-color: #10b981;
+        }
+
+        .aqi-moderate {
+            background-color: #f59e0b;
+        }
+
+        .aqi-poor {
+            background-color: #ef4444;
+        }
+
+        .aqi-hazardous {
+            background-color: #7f1d1d;
+        }
+
+        /* Animation for charts */
+        .animated-bar {
+            transition: height 1s ease-in-out;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            #map {
+                height: 50vh;
+            }
+            
+            .function-buttons {
+                flex-direction: column;
+            }
+            
+            .chart-container {
+                height: 250px !important;
+            }
+        }
+    </style>
+</head>
+<body class="light">
+    <!-- Header -->
+    <header class="sticky top-0 z-50 bg-opacity-95 bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md">
+        <div class="container mx-auto px-4 py-3 flex flex-col md:flex-row items-center justify-between">
+            <div class="flex items-center justify-between w-full md:w-auto mb-3 md:mb-0">
+                <div class="flex items-center">
+                    <i class="fas fa-fire text-2xl text-amber-400 mr-2"></i>
+                    <h1 class="text-xl font-bold">Global Wildfire & Air Quality Monitor</h1>
+                </div>
+                <button id="theme-toggle" class="md:hidden bg-blue-700 hover:bg-blue-800 p-2 rounded-full">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+            
+            <div class="flex flex-col md:flex-row w-full md:w-auto space-y-3 md:space-y-0 md:space-x-4 items-center">
+                <div class="search-container w-full md:w-64 relative">
+                    <div class="flex items-center">
+                        <input type="text" id="location-search" placeholder="Search location..." 
+                            class="w-full py-2 px-3 rounded-l-md bg-white bg-opacity-20 border border-blue-400 focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent placeholder-white placeholder-opacity-70 text-white">
+                        <button id="search-button" class="bg-amber-500 hover:bg-amber-600 text-white py-2 px-4 rounded-r-md transition duration-300 ease-in-out">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                    <div id="search-results" class="search-results hidden rounded-md bg-white shadow-lg text-gray-800"></div>
+                </div>
+                
+                <button id="theme-toggle-desktop" class="hidden md:block bg-blue-700 hover:bg-blue-800 p-2 rounded-full transition duration-300">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-6">
+        <!-- Function Buttons -->
+        <div class="function-buttons grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <button id="wildfire-btn" class="function-button flex flex-col items-center justify-center p-4 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-md transition-all">
+                <i class="fas fa-fire text-2xl mb-2"></i>
+                <span class="font-medium">Wildfires</span>
+            </button>
+            <button id="air-quality-btn" class="function-button flex flex-col items-center justify-center p-4 bg-green-500 hover:bg-green-600 text-white rounded-lg shadow-md transition-all">
+                <i class="fas fa-wind text-2xl mb-2"></i>
+                <span class="font-medium">Air Quality</span>
+            </button>
+            <button id="smoke-prediction-btn" class="function-button flex flex-col items-center justify-center p-4 bg-purple-500 hover:bg-purple-600 text-white rounded-lg shadow-md transition-all">
+                <i class="fas fa-smog text-2xl mb-2"></i>
+                <span class="font-medium">Smoke Prediction</span>
+            </button>
+            <button id="population-btn" class="function-button flex flex-col items-center justify-center p-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-md transition-all">
+                <i class="fas fa-users text-2xl mb-2"></i>
+                <span class="font-medium">Population</span>
+            </button>
+        </div>
+        
+        <!-- Status Badge -->
+        <div id="status-badge" class="hidden mb-4 py-2 px-4 rounded-full text-sm font-medium inline-block animate__animated animate__fadeIn"></div>
+        
+        <!-- Map Container -->
+        <div class="dashboard-card p-4 mb-6">
+            <h2 class="text-xl font-bold mb-3 flex items-center">
+                <i class="fas fa-map-marked-alt mr-2 text-blue-500"></i>
+                <span>Interactive Map</span>
+                <span id="current-view-label" class="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400"></span>
+            </h2>
+            <div id="map-container" class="relative">
+                <div id="map"></div>
+                <div id="map-loading" class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-10 hidden">
+                    <div class="loading-spinner"></div>
+                </div>
+                <div class="absolute top-4 right-4 z-10 bg-white dark:bg-gray-800 p-2 rounded-md shadow-md">
+                    <div class="flex flex-col space-y-2">
+                        <button id="zoom-in" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded" title="Zoom In">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                        <button id="zoom-out" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded" title="Zoom Out">
+                            <i class="fas fa-minus"></i>
+                        </button>
+                        <button id="recenter" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded" title="Recenter Map">
+                            <i class="fas fa-crosshairs"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Data Visualization Section -->
+        <div id="data-visualization" class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <!-- AQI Index Card -->
+            <div class="dashboard-card p-4 fade-in-up" style="animation-delay: 0.1s">
+                <h3 class="text-lg font-bold mb-3 flex items-center">
+                    <i class="fas fa-wind mr-2 text-green-500"></i>
+                    <span>Air Quality Index (AQI)</span>
+                </h3>
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div id="aqi-value" class="text-4xl font-bold">--</div>
+                        <div id="aqi-category" class="text-sm">Loading...</div>
+                        <div id="aqi-last-updated" class="text-xs text-gray-500 dark:text-gray-400 mt-1">Last updated: --</div>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div id="aqi-gauge" class="w-24 h-24 relative rounded-full border-8 flex items-center justify-center" style="border-color: #ccc">
+                            <span id="aqi-gauge-text" class="text-lg font-bold">--</span>
+                        </div>
+                        <div id="aqi-recommendation" class="text-xs text-center mt-2 max-w-xs">--</div>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <h4 class="font-medium text-sm mb-1">Pollutant Breakdown</h4>
+                    <div class="grid grid-cols-3 gap-2 text-xs">
+                        <div class="data-point p-2 bg-opacity-20 bg-blue-500 rounded">
+                            <div class="font-medium">PM2.5</div>
+                            <div id="pm25-value" class="text-lg font-bold">--</div>
+                        </div>
+                        <div class="data-point p-2 bg-opacity-20 bg-purple-500 rounded">
+                            <div class="font-medium">PM10</div>
+                            <div id="pm10-value" class="text-lg font-bold">--</div>
+                        </div>
+                        <div class="data-point p-2 bg-opacity-20 bg-green-500 rounded">
+                            <div class="font-medium">O₃</div>
+                            <div id="o3-value" class="text-lg font-bold">--</div>
+                        </div>
+                        <div class="data-point p-2 bg-opacity-20 bg-yellow-500 rounded">
+                            <div class="font-medium">NO₂</div>
+                            <div id="no2-value" class="text-lg font-bold">--</div>
+                        </div>
+                        <div class="data-point p-2 bg-opacity-20 bg-red-500 rounded">
+                            <div class="font-medium">CO</div>
+                            <div id="co-value" class="text-lg font-bold">--</div>
+                        </div>
+                        <div class="data-point p-2 bg-opacity-20 bg-gray-500 rounded">
+                            <div class="font-medium">SO₂</div>
+                            <div id="so2-value" class="text-lg font-bold">--</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Wildfire Status Card -->
+            <div class="dashboard-card p-4 fade-in-up" style="animation-delay: 0.2s">
+                <h3 class="text-lg font-bold mb-3 flex items-center">
+                    <i class="fas fa-fire mr-2 text-red-500"></i>
+                    <span>Wildfire Status</span>
+                </h3>
+                <div class="flex flex-col">
+                    <div class="flex justify-between mb-4">
+                        <div>
+                            <div id="active-fires" class="text-4xl font-bold">--</div>
+                            <div class="text-sm">Active Fires</div>
+                        </div>
+                        <div>
+                            <div id="fire-danger-level" class="text-4xl font-bold">--</div>
+                            <div class="text-sm">Fire Danger Level</div>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="font-medium text-sm mb-1">Nearest Active Fires</h4>
+                        <div id="nearest-fires" class="max-h-36 overflow-y-auto text-sm">
+                            <div class="flex items-center justify-center h-24 text-gray-500">
+                                <div class="text-center">
+                                    <i class="fas fa-search mb-2 text-xl"></i>
+                                    <p>Search a location to see nearest fires</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Chart Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <!-- AQI Trend Chart -->
+            <div class="dashboard-card p-4 fade-in-up chart-container" style="animation-delay: 0.3s">
+                <h3 class="text-lg font-bold mb-3 flex items-center">
+                    <i class="fas fa-chart-line mr-2 text-blue-500"></i>
+                    <span>AQI Trend (24 hours)</span>
+                </h3>
+                <div style="height: 300px;">
+                    <canvas id="aqi-chart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Smoke Forecast Chart -->
+            <div class="dashboard-card p-4 fade-in-up chart-container" style="animation-delay: 0.4s">
+                <h3 class="text-lg font-bold mb-3 flex items-center">
+                    <i class="fas fa-cloud mr-2 text-purple-500"></i>
+                    <span>Smoke Forecast (72 hours)</span>
+                </h3>
+                <div style="height: 300px;">
+                    <canvas id="smoke-forecast-chart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Ozone Layer Section -->
+        <div class="dashboard-card p-4 mb-6 fade-in-up" style="animation-delay: 0.5s">
+            <h3 class="text-lg font-bold mb-3 flex items-center">
+                <i class="fas fa-layer-group mr-2 text-teal-500"></i>
+                <span>Ozone Layer Analysis</span>
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="col-span-1">
+                    <div class="bg-opacity-10 bg-teal-500 p-4 rounded-lg">
+                        <h4 class="font-medium mb-2">Current Ozone Levels</h4>
+                        <div id="ozone-level" class="text-3xl font-bold mb-1">--</div>
+                        <div id="ozone-status" class="text-sm">Loading data...</div>
+                        <div class="mt-3">
+                            <div class="text-sm font-medium mb-1">Global Average: <span id="global-ozone-avg">--</span></div>
+                            <div class="text-sm">Historical Average: <span id="historical-ozone-avg">--</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-span-2">
+                    <div style="height: 200px;">
+                        <canvas id="ozone-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Population Impact Section -->
+        <div class="dashboard-card p-4 mb-6 fade-in-up" style="animation-delay: 0.6s">
+            <h3 class="text-lg font-bold mb-3 flex items-center">
+                <i class="fas fa-users mr-2 text-blue-500"></i>
+                <span>Population Impact</span>
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="col-span-1">
+                    <div class="bg-opacity-10 bg-blue-500 p-4 rounded-lg">
+                        <h4 class="font-medium mb-2">Impact Summary</h4>
+                        <div class="space-y-2">
+                            <div class="flex justify-between">
+                                <span>Population Affected:</span>
+                                <span id="population-affected" class="font-bold">--</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Risk Level:</span>
+                                <span id="risk-level" class="font-bold">--</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Health Alert:</span>
+                                <span id="health-alert" class="font-bold">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-span-2">
+                    <div class="bg-opacity-10 bg-blue-500 p-4 rounded-lg h-full">
+                        <h4 class="font-medium mb-2">Health Recommendations</h4>
+                        <div id="health-recommendations" class="text-sm space-y-2">
+                            <p>Search a location to see health recommendations based on current air quality.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Report Download Section -->
+        <div class="dashboard-card p-4 mb-6 fade-in-up" style="animation-delay: 0.7s">
+            <h3 class="text-lg font-bold mb-3 flex items-center">
+                <i class="fas fa-file-download mr-2 text-blue-500"></i>
+                <span>Report Generation</span>
+            </h3>
+            <div class="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-4">
+                <div class="flex-grow">
+                    <p class="text-sm mb-2">Generate a comprehensive report with all current data for the selected location including:</p>
+                    <ul class="text-sm list-disc list-inside space-y-1">
+                        <li>Air quality indices and pollutant breakdown</li>
+                        <li>Wildfire status and proximity analysis</li>
+                        <li>Smoke prediction for the next 72 hours</li>
+                        <li>Population impact assessment</li>
+                        <li>Ozone layer analysis</li>
+                    </ul>
+                </div>
+                <div class="flex items-center">
+                    <button id="generate-report" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md transition duration-300 ease-in-out flex items-center disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="fas fa-file-pdf mr-2"></i>
+                        <span>Generate PDF Report</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white py-6">
+        <div class="container mx-auto px-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <h3 class="text-lg font-bold mb-3">Contact Information</h3>
+                    <div class="space-y-2">
+                        <div class="flex items-center">
+                            <i class="fas fa-envelope w-6"></i>
+                            <a href="mailto:forevermoon2124@gmail.com" class="ml-2 hover:underline">forevermoon2124@gmail.com</a>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-phone-alt w-6"></i>
+                            <span class="ml-2">+91 6366633222</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-user w-6"></i>
+                            <span class="ml-2">Developed by M SREERAM REDDY</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-bold mb-3">Data Sources</h3>
+                    <ul class="space-y-1 text-sm">
+                        <li><i class="fas fa-external-link-alt mr-1"></i> <a href="https://firms.modaps.eosdis.nasa.gov/map/" class="hover:underline" target="_blank">NASA FIRMS</a> - Wildfire data</li>
+                        <li><i class="fas fa-external-link-alt mr-1"></i> <a href="https://www.iqair.com/" class="hover:underline" target="_blank">IQAir</a> - Air quality data</li>
+                        <li><i class="fas fa-external-link-alt mr-1"></i> <a href="https://ozonewatch.gsfc.nasa.gov/" class="hover:underline" target="_blank">NASA Ozone Watch</a> - Ozone layer data</li>
+                        <li><i class="fas fa-external-link-alt mr-1"></i> <a href="https://www.worldpop.org/" class="hover:underline" target="_blank">WorldPop</a> - Population data</li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-bold mb-3">About This Tool</h3>
+                    <p class="text-sm">This interactive platform combines wildfire monitoring, air quality tracking, smoke prediction, and population impact assessment. It provides real-time data and visualization to help communities stay informed about environmental hazards.</p>
+                    <div class="mt-3 flex space-x-3">
+                        <a href="#" class="text-white hover:text-blue-200 transition-colors">
+                            <i class="fab fa-twitter text-xl"></i>
+                        </a>
+                        <a href="#" class="text-white hover:text-blue-200 transition-colors">
+                            <i class="fab fa-facebook text-xl"></i>
+                        </a>
+                        <a href="#" class="text-white hover:text-blue-200 transition-colors">
+                            <i class="fab fa-github text-xl"></i>
+                        </a>
+                        <a href="#" class="text-white hover:text-blue-200 transition-colors">
+                            <i class="fab fa-linkedin text-xl"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-6 pt-5 border-t border-blue-600 text-center text-sm">
+                <p>&copy; 2025 Global Wildfire & Air Quality Monitor. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/animejs@3.2.1/lib/anime.min.js"></script>
+    <script>
+        // Initialize state
+        const state = {
+            theme: 'light',
+            currentLocation: {
+                name: null,
+                lat: 20,
+                lng: 0
+            },
+            activeView: 'wildfire',
+            data: {
+                airQuality: null,
+                wildfires: null,
+                smokePrediction: null,
+                population: null,
+                ozone: null
+            },
+            map: null,
+            markers: {
+                wildfire: [],
+                airQuality: []
+            }
+        };
+
+        // DOM Elements
+        const mapElement = document.getElementById('map');
+        const searchInput = document.getElementById('location-search');
+        const searchButton = document.getElementById('search-button');
+        const searchResults = document.getElementById('search-results');
+        const themeToggle = document.getElementById('theme-toggle');
+        const themeToggleDesktop = document.getElementById('theme-toggle-desktop');
+        const wildfireBtn = document.getElementById('wildfire-btn');
+        const airQualityBtn = document.getElementById('air-quality-btn');
+        const smokePredictionBtn = document.getElementById('smoke-prediction-btn');
+        const populationBtn = document.getElementById('population-btn');
+        const generateReportBtn = document.getElementById('generate-report');
+        const mapLoading = document.getElementById('map-loading');
+        const statusBadge = document.getElementById('status-badge');
+        
+        // Initialize the map
+        function initMap() {
+            state.map = L.map('map').setView([state.currentLocation.lat, state.currentLocation.lng], 3);
+            
+            // Add tile layer based on theme
+            updateMapTiles();
+            
+            // Add map controls
+            document.getElementById('zoom-in').addEventListener('click', () => state.map.zoomIn());
+            document.getElementById('zoom-out').addEventListener('click', () => state.map.zoomOut());
+            document.getElementById('recenter').addEventListener('click', () => state.map.setView([state.currentLocation.lat, state.currentLocation.lng], 5));
+            
+            // Add scale
+            L.control.scale().addTo(state.map);
+        }
+        
+        function updateMapTiles() {
+            if (state.map) {
+                // Remove existing tile layers
+                state.map.eachLayer(layer => {
+                    if (layer instanceof L.TileLayer) {
+                        state.map.removeLayer(layer);
+                    }
+                });
+                
+                // Add new tile layer based on theme
+                if (state.theme === 'dark') {
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                        maxZoom: 19
+                    }).addTo(state.map);
+                } else {
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                        maxZoom: 19
+                    }).addTo(state.map);
+                }
+            }
+        }
+        
+        // Theme Toggle
+        function toggleTheme() {
+            const body = document.body;
+            const currentTheme = state.theme;
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            
+            body.classList.remove(currentTheme);
+            body.classList.add(newTheme);
+            
+            state.theme = newTheme;
+            
+            // Update the moon/sun icon
+            const themeIcons = [themeToggle.querySelector('i'), themeToggleDesktop.querySelector('i')];
+            themeIcons.forEach(icon => {
+                if (newTheme === 'dark') {
+                    icon.classList.remove('fa-moon');
+                    icon.classList.add('fa-sun');
+                } else {
+                    icon.classList.remove('fa-sun');
+                    icon.classList.add('fa-moon');
+                }
+            });
+            
+            // Update map tiles
+            updateMapTiles();
+        }
+        
+        // Search for location
+        async function searchLocation(query) {
+            if (!query.trim()) return;
+            
+            showLoading();
+            updateStatus('Searching for location...', 'blue');
+            
+            try {
+                // Use Nominatim for geocoding
+                const response = await fetch(https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)});
+                const data = await response.json();
+                
+                if (data && data.length > 0) {
+                    displaySearchResults(data);
+                } else {
+                    searchResults.innerHTML = '<div class="p-3 text-center">No results found</div>';
+                    searchResults.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Error searching for location:', error);
+                updateStatus('Error searching for location', 'red');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        function displaySearchResults(results) {
+            searchResults.innerHTML = '';
+            
+            results.slice(0, 5).forEach(result => {
+                const resultItem = document.createElement('div');
+                resultItem.className = 'p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-200';
+                resultItem.textContent = result.display_name;
+                
+                resultItem.addEventListener('click', () => {
+                    selectLocation(result);
+                    searchResults.classList.add('hidden');
+                });
+                
+                searchResults.appendChild(resultItem);
+            });
+            
+            searchResults.classList.remove('hidden');
+        }
+        
+        function selectLocation(location) {
+            state.currentLocation = {
+                name: location.display_name,
+                lat: parseFloat(location.lat),
+                lng: parseFloat(location.lon)
+            };
+            
+            searchInput.value = location.display_name;
+            
+            // Update map
+            state.map.setView([state.currentLocation.lat, state.currentLocation.lng], 10);
+            
+            // Add a marker for the selected location
+            clearMarkers();
+            
+            const locationMarker = L.marker([state.currentLocation.lat, state.currentLocation.lng])
+                .addTo(state.map)
+                .bindPopup(<b>${location.display_name}</b>)
+                .openPopup();
+            
+            // Fetch data for the location
+            loadDataForLocation();
+        }
+        
+        function clearMarkers() {
+            // Clear existing markers
+            Object.values(state.markers).forEach(markerGroup => {
+                markerGroup.forEach(marker => state.map.removeLayer(marker));
+                markerGroup.length = 0;
+            });
+        }
+        
+        // Data loading functions
+        async function loadDataForLocation() {
+            if (!state.currentLocation.name) return;
+            
+            showLoading();
+            updateStatus('Loading data for ' + state.currentLocation.name, 'blue');
+            
+            try {
+                // For this demonstration, we'll simulate API calls
+                await Promise.all([
+                    loadAirQualityData(),
+                    loadWildfireData(),
+                    loadSmokePredictionData(),
+                    loadPopulationData(),
+                    loadOzoneData()
+                ]);
+                
+                updateStatus('Data loaded successfully for ' + state.currentLocation.name, 'green');
+                updateDashboard();
+                
+                // Enable report generation
+                generateReportBtn.disabled = false;
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                updateStatus('Error loading data', 'red');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        // Data loading simulation functions
+        async function loadAirQualityData() {
+            // Simulate API call delay
+            await new Promise(resolve => setTimeout(resolve, 800));
+            
+            // Generate mock air quality data
+            const lat = state.currentLocation.lat;
+            const lng = state.currentLocation.lng;
+            
+            // Create a hash of the coordinates to get consistent results for same location
+            const locationHash = Math.abs(lat * 10000 + lng * 1000);
+            const baseAQI = 30 + (locationHash % 150);
+            
+            state.data.airQuality = {
+                aqi: baseAQI,
+                category: getAQICategory(baseAQI),
+                pollutants: {
+                    pm25: Math.round((baseAQI * 0.6) * 100) / 100,
+                    pm10: Math.round((baseAQI * 1.2) * 100) / 100,
+                    o3: Math.round((locationHash % 60) * 100) / 100,
+                    no2: Math.round((locationHash % 40) * 100) / 100,
+                    co: Math.round((locationHash % 800) / 100 * 100) / 100,
+                    so2: Math.round((locationHash % 20) * 100) / 100
+                },
+                lastUpdated: new Date().toISOString(),
+                hourlyData: generateHourlyAQIData(baseAQI)
+            };
+            
+            // Add air quality markers around the location
+            addAirQualityMarkers();
+        }
+        
+        function addAirQualityMarkers() {
+            clearMarkers();
+            
+            const lat = state.currentLocation.lat;
+            const lng = state.currentLocation.lng;
+            
+            // Add markers in a grid around the selected location
+            for (let i = -0.2; i <= 0.2; i += 0.1) {
+                for (let j = -0.2; j <= 0.2; j += 0.1) {
+                    if (i === 0 && j === 0) continue; // Skip center point where location marker is
+                    
+                    const markerLat = lat + i;
+                    const markerLng = lng + j;
+                    
+                    // Generate a semi-random AQI value for this location
+                    const locationHash = Math.abs(markerLat * 10000 + markerLng * 1000);
+                    const baseAQI = state.data.airQuality.aqi + (locationHash % 40) - 20;
+                    const aqiValue = Math.max(0, Math.min(500, baseAQI));
+                    const category = getAQICategory(aqiValue);
+                    
+                    // Create custom marker
+                    const markerElement = document.createElement('div');
+                    markerElement.className = air-quality-marker aqi-${category.toLowerCase().replace(' ', '-')};
+                    
+                    const markerIcon = L.divIcon({
+                        html: markerElement,
+                        className: 'air-quality-marker-container',
+                        iconSize: [12, 12]
+                    });
+                    
+                    const marker = L.marker([markerLat, markerLng], { icon: markerIcon })
+                        .addTo(state.map)
+                        .bindPopup(
+                            <div>
+                                <h3 class="font-bold">AQI: ${aqiValue}</h3>
+                                <p>${category}</p>
+                            </div>
+                        );
+                    
+                    state.markers.airQuality.push(marker);
+                }
+            }
+        }
+        
+        async function loadWildfireData() {
+            // Simulate API call delay
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            const lat = state.currentLocation.lat;
+            const lng = state.currentLocation.lng;
+            
+            // Generate a location hash for consistent results
+            const locationHash = Math.abs(lat * 10000 + lng * 1000);
+            
+            // Number of fires depends on general climate of the area (more fires near equator, fewer near poles)
+            const baseFires = Math.max(0, 20 - Math.abs(lat) / 4) + (locationHash % 10);
+            
+            // Generate mock wildfire data
+            state.data.wildfires = {
+                activeFiresInRegion: Math.round(baseFires),
+                fireDangerLevel: getFireDangerLevel(baseFires, lat),
+                nearestFires: generateNearestFires(lat, lng, baseFires)
+            };
+            
+            // Add wildfire markers
+            addWildfireMarkers();
+        }
+        
+        function addWildfireMarkers() {
+            const fires = state.data.wildfires.nearestFires;
+            
+            fires.forEach(fire => {
+                // Create custom marker
+                const markerElement = document.createElement('div');
+                markerElement.className = 'wildfire-marker pulse-glow';
+                
+                const markerIcon = L.divIcon({
+                    html: markerElement,
+                    className: 'wildfire-marker-container',
+                    iconSize: [10, 10]
+                });
+                
+                const marker = L.marker([fire.lat, fire.lng], { icon: markerIcon })
+                    .addTo(state.map)
+                    .bindPopup(
+                        <div>
+                            <h3 class="font-bold">${fire.name}</h3>
+                            <p>Distance: ${fire.distance} km</p>
+                            <p>Intensity: ${fire.intensity}</p>
+                            <p>Detected: ${fire.detected}</p>
+                        </div>
+                    );
+                
+                state.markers.wildfire.push(marker);
+            });
+        }
+        
+        async function loadSmokePredictionData() {
+            // Simulate API call delay
+            await new Promise(resolve => setTimeout(resolve, 1200));
+            
+            const lat = state.currentLocation.lat;
+            const lng = state.currentLocation.lng;
+            
+            // Location hash for consistent results
+            const locationHash = Math.abs(lat * 10000 + lng * 1000);
+            
+            // Base smoke level depends on number of fires and wind conditions
+            const baseSmokeLevel = (state.data.wildfires?.activeFiresInRegion || 5) * 2;
+            
+            // Generate mock smoke prediction data
+            state.data.smokePrediction = {
+                currentSmokeLevel: baseSmokeLevel + (locationHash % 10),
+                forecast: generateSmokeForecast(baseSmokeLevel, locationHash)
+            };
+        }
+        
+        async function loadPopulationData() {
+            // Simulate API call delay
+            await new Promise(resolve => setTimeout(resolve, 900));
+            
+            const lat = state.currentLocation.lat;
+            const lng = state.currentLocation.lng;
+            
+            // Location hash for consistent results
+            const locationHash = Math.abs(lat * 10000 + lng * 1000);
+            
+            // Base population depends on coordinates (more people near coasts and in temperate regions)
+            const basePopulation = 100000 + (locationHash % 1000000);
+            
+            // Calculate affected population based on AQI
+            const affectedPercentage = state.data.airQuality ? 
+                Math.min(100, state.data.airQuality.aqi / 3) : 20;
+            
+            // Generate mock population impact data
+            state.data.population = {
+                totalPopulation: basePopulation,
+                affectedPopulation: Math.round(basePopulation * (affectedPercentage / 100)),
+                riskLevel: getRiskLevel(affectedPercentage),
+                healthAlert: getHealthAlert(state.data.airQuality?.aqi || 50),
+                recommendations: generateHealthRecommendations(state.data.airQuality?.aqi || 50)
+            };
+        }
+        
+        async function loadOzoneData() {
+            // Simulate API call delay
+            await new Promise(resolve => setTimeout(resolve, 1100));
+            
+            const lat = state.currentLocation.lat;
+            
+            // Ozone levels are generally thinner near equator and thicker near poles
+            const latitudeFactor = Math.abs(lat) / 90;
+            const baseOzoneValue = 300 + (100 * latitudeFactor);
+            
+            // Generate mock ozone data
+            state.data.ozone = {
+                currentLevel: Math.round(baseOzoneValue),
+                status: getOzoneStatus(baseOzoneValue, lat),
+                globalAverage: 300,
+                historicalAverage: 310,
+                monthlyTrend: generateOzoneTrend(baseOzoneValue)
+            };
+        }
+        
+        // Dashboard update functions
+        function updateDashboard() {
+            updateAirQualitySection();
+            updateWildfireSection();
+            updateCharts();
+            updateOzoneSection();
+            updatePopulationSection();
+            
+            // Animate the data points
+            animateDataPoints();
+        }
+        
+        function updateAirQualitySection() {
+            if (!state.data.airQuality) return;
+            
+            const { aqi, category, pollutants, lastUpdated } = state.data.airQuality;
+            
+            // Update AQI value and category
+            document.getElementById('aqi-value').textContent = aqi;
+            document.getElementById('aqi-category').textContent = category;
+            document.getElementById('aqi-last-updated').textContent = Last updated: ${formatDateTime(lastUpdated)};
+            
+            // Update gauge
+            const gauge = document.getElementById('aqi-gauge');
+            const gaugeText = document.getElementById('aqi-gauge-text');
+            
+            gaugeText.textContent = aqi;
+            
+            // Set gauge color based on AQI category
+            let gaugeColor = '#10b981'; // Default green
+            if (aqi > 50) gaugeColor = '#f59e0b';
+            if (aqi > 100) gaugeColor = '#f97316';
+            if (aqi > 150) gaugeColor = '#ef4444';
+            if (aqi > 200) gaugeColor = '#7f1d1d';
+            if (aqi > 300) gaugeColor = '#3f0f1f';
+            
+            gauge.style.borderColor = gaugeColor;
+            
+            // Update pollutant values
+            document.getElementById('pm25-value').textContent = pollutants.pm25;
+            document.getElementById('pm10-value').textContent = pollutants.pm10;
+            document.getElementById('o3-value').textContent = pollutants.o3;
+            document.getElementById('no2-value').textContent = pollutants.no2;
+            document.getElementById('co-value').textContent = pollutants.co;
+            document.getElementById('so2-value').textContent = pollutants.so2;
+            
+            // Update recommendation
+            document.getElementById('aqi-recommendation').textContent = getAQIRecommendation(aqi);
+        }
+        
+        function updateWildfireSection() {
+            if (!state.data.wildfires) return;
+            
+            const { activeFiresInRegion, fireDangerLevel, nearestFires } = state.data.wildfires;
+            
+            // Update wildfire counts and danger level
+            document.getElementById('active-fires').textContent = activeFiresInRegion;
+            document.getElementById('fire-danger-level').textContent = fireDangerLevel;
+            
+            // Update nearest fires list
+            const nearestFiresEl = document.getElementById('nearest-fires');
+            nearestFiresEl.innerHTML = '';
+            
+            if (nearestFires.length === 0) {
+                nearestFiresEl.innerHTML = '<p class="text-center py-3">No active fires in this region</p>';
+                return;
+            }
+            
+            nearestFires.forEach(fire => {
+                const fireItem = document.createElement('div');
+                fireItem.className = 'p-2 border-b border-gray-200 dark:border-gray-700 last:border-0';
+                fireItem.innerHTML = 
+                    <div class="flex justify-between">
+                        <div>
+                            <div class="font-medium">${fire.name}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">Detected: ${fire.detected}</div>
+                        </div>
+                        <div class="text-right">
+                            <div>${fire.distance} km</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">Intensity: ${fire.intensity}</div>
+                        </div>
+                    </div>
+                ;
+                nearestFiresEl.appendChild(fireItem);
+            });
+        }
+        
+        function updateOzoneSection() {
+            if (!state.data.ozone) return;
+            
+            const { currentLevel, status, globalAverage, historicalAverage } = state.data.ozone;
+            
+            document.getElementById('ozone-level').textContent = ${currentLevel} DU;
+            document.getElementById('ozone-status').textContent = status;
+            document.getElementById('global-ozone-avg').textContent = ${globalAverage} DU;
+            document.getElementById('historical-ozone-avg').textContent = ${historicalAverage} DU;
+        }
+        
+        function updatePopulationSection() {
+            if (!state.data.population) return;
+            
+            const { affectedPopulation, riskLevel, healthAlert, recommendations } = state.data.population;
+            
+            document.getElementById('population-affected').textContent = formatNumber(affectedPopulation);
+            document.getElementById('risk-level').textContent = riskLevel;
+            document.getElementById('health-alert').textContent = healthAlert;
+            
+            // Update health recommendations
+            const healthRecommendationsEl = document.getElementById('health-recommendations');
+            healthRecommendationsEl.innerHTML = '';
+            
+            recommendations.forEach(rec => {
+                const recItem = document.createElement('p');
+                recItem.className = 'mb-1';
+                recItem.innerHTML = <i class="fas fa-check-circle text-green-500 mr-1"></i> ${rec};
+                healthRecommendationsEl.appendChild(recItem);
+            });
+        }
+        
+        // Chart updates
+        function updateCharts() {
+            updateAQIChart();
+            updateSmokeForecastChart();
+            updateOzoneChart();
+        }
+        
+        function updateAQIChart() {
+            if (!state.data.airQuality?.hourlyData) return;
+            
+            const ctx = document.getElementById('aqi-chart').getContext('2d');
+            
+            const hourlyData = state.data.airQuality.hourlyData;
+            const labels = hourlyData.map(d => d.hour);
+            const data = hourlyData.map(d => d.aqi);
+            
+            // Determine gradient colors based on AQI values
+            const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+            gradient.addColorStop(0, 'rgba(239, 68, 68, 0.7)');  // Red for high values
+            gradient.addColorStop(0.5, 'rgba(245, 158, 11, 0.7)'); // Yellow for mid values
+            gradient.addColorStop(1, 'rgba(16, 185, 129, 0.7)');  // Green for low values
+            
+            if (window.aqiChart) {
+                window.aqiChart.destroy();
+            }
+            
+            window.aqiChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'AQI',
+                        data: data,
+                        backgroundColor: gradient,
+                        borderColor: 'rgba(59, 130, 246, 0.8)',
+                        borderWidth: 2,
+                        pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+                        pointBorderColor: '#fff',
+                        pointRadius: 4,
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                            padding: 10,
+                            cornerRadius: 4,
+                            titleFont: {
+                                size: 14,
+                                weight: 'bold'
+                            },
+                            bodyFont: {
+                                size: 13
+                            },
+                            callbacks: {
+                                label: function(context) {
+                                    return AQI: ${context.parsed.y};
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                color: state.theme === 'dark' ? '#e5e7eb' : '#4b5563'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: state.theme === 'dark' ? '#e5e7eb' : '#4b5563'
+                            },
+                            grid: {
+                                color: state.theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 2000,
+                        easing: 'easeOutQuart'
+                    }
+                }
+            });
+        }
+        
+        function updateSmokeForecastChart() {
+            if (!state.data.smokePrediction?.forecast) return;
+            
+            const ctx = document.getElementById('smoke-forecast-chart').getContext('2d');
+            
+            const forecast = state.data.smokePrediction.forecast;
+            const labels = forecast.map(d => d.time);
+            const data = forecast.map(d => d.level);
+            
+            if (window.smokeChart) {
+                window.smokeChart.destroy();
+            }
+            
+            window.smokeChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Smoke Level',
+                        data: data,
+                        backgroundColor: 'rgba(124, 58, 237, 0.6)',
+                        borderColor: 'rgba(124, 58, 237, 1)',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                        barPercentage: 0.6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                            padding: 10,
+                            cornerRadius: 4
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                color: state.theme === 'dark' ? '#e5e7eb' : '#4b5563'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: state.theme === 'dark' ? '#e5e7eb' : '#4b5563'
+                            },
+                            grid: {
+                                color: state.theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                            }
+                        }
+                    },
+                    animation: {
+                        delay: function(context) {
+                            return context.dataIndex * 100;
+                        },
+                        duration: 1000,
+                        easing: 'easeOutQuart'
+                    }
+                }
+            });
+        }
+        
+        function updateOzoneChart() {
+            if (!state.data.ozone?.monthlyTrend) return;
+            
+            const ctx = document.getElementById('ozone-chart').getContext('2d');
+            
+            const trend = state.data.ozone.monthlyTrend;
+            const labels = trend.map(d => d.month);
+            const data = trend.map(d => d.value);
+            
+            if (window.ozoneChart) {
+                window.ozoneChart.destroy();
+            }
+            
+            window.ozoneChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Ozone DU',
+                        data: data,
+                        backgroundColor: 'rgba(20, 184, 166, 0.2)',
+                        borderColor: 'rgba(20, 184, 166, 1)',
+                        borderWidth: 2,
+                        pointBackgroundColor: 'rgba(20, 184, 166, 1)',
+                        pointBorderColor: '#fff',
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                color: state.theme === 'dark' ? '#e5e7eb' : '#4b5563'
+                            }
+                        },
+                        y: {
+                            ticks: {
+                                color: state.theme === 'dark' ? '#e5e7eb' : '#4b5563'
+                            },
+                            grid: {
+                                color: state.theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 2000
+                    }
+                }
+            });
+        }
+        
+        // Helper functions
+        function getAQICategory(aqi) {
+            if (aqi <= 50) return 'Good';
+            if (aqi <= 100) return 'Moderate';
+            if (aqi <= 150) return 'Unhealthy for Sensitive Groups';
+            if (aqi <= 200) return 'Unhealthy';
+            if (aqi <= 300) return 'Very Unhealthy';
+            return 'Hazardous';
+        }
+        
+        function getAQIRecommendation(aqi) {
+            if (aqi <= 50) return 'Air quality is satisfactory, and air pollution poses little or no risk.';
+            if (aqi <= 100) return 'Air quality is acceptable, but there may be a risk for some people, particularly those who are unusually sensitive to air pollution.';
+            if (aqi <= 150) return 'Members of sensitive groups may experience health effects. The general public is less likely to be affected.';
+            if (aqi <= 200) return 'Some members of the general public may experience health effects; members of sensitive groups may experience more serious health effects.';
+            if (aqi <= 300) return 'Health alert: The risk of health effects is increased for everyone.';
+            return 'Health warning of emergency conditions: everyone is more likely to be affected.';
+        }
+        
+        function getFireDangerLevel(fires, latitude) {
+            // More fires and drier conditions near equator
+            const latitudeAdjustment = Math.max(0, 20 - Math.abs(latitude) / 3);
+            const totalRisk = fires + latitudeAdjustment;
+            
+            if (totalRisk < 10) return 'Low';
+            if (totalRisk < 20) return 'Moderate';
+            if (totalRisk < 30) return 'High';
+            if (totalRisk < 40) return 'Very High';
+            return 'Extreme';
+        }
+        
+        function getRiskLevel(percentage) {
+            if (percentage < 10) return 'Low';
+            if (percentage < 30) return 'Moderate';
+            if (percentage < 50) return 'High';
+            if (percentage < 70) return 'Very High';
+            return 'Extreme';
+        }
+        
+        function getHealthAlert(aqi) {
+            if (aqi <= 50) return 'None';
+            if (aqi <= 100) return 'Sensitive Groups';
+            if (aqi <= 150) return 'General Caution';
+            if (aqi <= 200) return 'Health Advisory';
+            if (aqi <= 300) return 'Health Warning';
+            return 'Emergency';
+        }
+        
+        function getOzoneStatus(value, latitude) {
+            // Northern/Southern hemisphere seasonal variations
+            const isNorthernHemisphere = latitude > 0;
+            const currentMonth = new Date().getMonth(); // 0-11
+            
+            // Seasonal factor: ozone is typically lower during respective winter
+            const isWinter = isNorthernHemisphere ? 
+                (currentMonth >= 11 || currentMonth <= 2) : // Northern winter: Dec-Mar
+                (currentMonth >= 5 && currentMonth <= 8);   // Southern winter: Jun-Sep
+            
+            const seasonalAdjustment = isWinter ? -20 : 10;
+            const adjustedValue = value + seasonalAdjustment;
+            
+            if (adjustedValue < 220) return 'Depleted - Concern';
+            if (adjustedValue < 280) return 'Below Normal';
+            if (adjustedValue < 320) return 'Normal Range';
+            if (adjustedValue < 360) return 'Above Normal';
+            return 'Enhanced';
+        }
+        
+        function generateHourlyAQIData(baseAQI) {
+            const hours = 24;
+            const hourlyData = [];
+            
+            // Generate variation pattern
+            const variationPattern = [];
+            for (let i = 0; i < hours; i++) {
+                // Higher pollution during morning and evening rush hours
+                let hourFactor = 1;
+                if (i >= 7 && i <= 9) hourFactor = 1.2; // Morning rush
+                if (i >= 16 && i <= 19) hourFactor = 1.3; // Evening rush
+                if (i >= 0 && i <= 5) hourFactor = 0.8; // Night time
+                
+                variationPattern.push(hourFactor);
+            }
+            
+            // Current hour
+            const currentHour = new Date().getHours();
+            
+            // Generate data for each hour
+            for (let i = 0; i < hours; i++) {
+                const hourIndex = (currentHour - 23 + i + 24) % 24; // Start 23 hours ago
+                
+                const hourFactor = variationPattern[hourIndex];
+                const randomVariation = (Math.random() * 20) - 10; // -10 to +10
+                
+                const hourAQI = Math.max(0, Math.round(baseAQI * hourFactor + randomVariation));
+                
+                // Format the hour label
+                const hourLabel = hourIndex % 12 === 0 ? '12' : hourIndex % 12;
+                const amPm = hourIndex < 12 ? 'AM' : 'PM';
+                
+                hourlyData.push({
+                    hour: ${hourLabel}${amPm},
+                    aqi: hourAQI
+                });
+            }
+            
+            return hourlyData;
+        }
+        
+        function generateNearestFires(lat, lng, baseCount) {
+            const fires = [];
+            const fireCount = Math.min(5, Math.round(baseCount)); // Max 5 fires
+            
+            if (fireCount === 0) return [];
+            
+            const fireNames = [
+                'Forest Fire', 'Brush Fire', 'Wildfire', 'Grassland Fire', 
+                'Mountain Fire', 'Valley Fire', 'Ridge Fire', 'Canyon Fire',
+                'Hill Fire', 'Park Fire', 'Reserve Fire', 'Woods Fire'
+            ];
+            
+            const intensities = ['Low', 'Moderate', 'High', 'Extreme'];
+            
+            // Generate random fires in the vicinity
+            for (let i = 0; i < fireCount; i++) {
+                // Random direction and distance
+                const angle = Math.random() * Math.PI * 2;
+                
+                // Distance increases for each fire (nearest first)
+                const baseDistance = 5 + (i * 10);
+                const distance = baseDistance + (Math.random() * 15);
+                
+                // Calculate new lat/lng
+                const latOffset = (Math.cos(angle) * distance) / 111.32; // 1 degree lat = 111.32 km
+                const lngOffset = (Math.sin(angle) * distance) / (111.32 * Math.cos(lat * Math.PI / 180));
+                
+                const fireLat = lat + latOffset;
+                const fireLng = lng + lngOffset;
+                
+                // Random fire intensity
+                const intensityIndex = Math.floor(Math.random() * intensities.length);
+                
+                // Random fire name
+                const nameIndex = Math.floor(Math.random() * fireNames.length);
+                
+                // Random detection time (within last 24 hours)
+                const hoursAgo = Math.floor(Math.random() * 24);
+                const detectionDate = new Date();
+                detectionDate.setHours(detectionDate.getHours() - hoursAgo);
+                
+                fires.push({
+                    name: fireNames[nameIndex],
+                    lat: fireLat,
+                    lng: fireLng,
+                    distance: Math.round(distance),
+                    intensity: intensities[intensityIndex],
+                    detected: ${hoursAgo}h ago
+                });
+            }
+            
+            return fires;
+        }
+        
+        function generateSmokeForecast(baseLevel, locationHash) {
+            const forecast = [];
+            const hours = 72; // 3 days forecast
+            
+            // Random wind direction and speed factor
+            const windFactor = (locationHash % 10) / 10 + 0.5; // 0.5 to 1.5
+            
+            // Generate hourly forecast
+            for (let i = 0; i < hours; i++) {
+                const hour = i + 1;
+                
+                // Time labels (group by 6 hours)
+                const timeGroup = Math.floor(hour / 6);
+                const day = Math.floor(timeGroup / 4) + 1;
+                const timeOfDay = timeGroup % 4;
+                
+                let timePeriod;
+                if (timeOfDay === 0) timePeriod = 'Night';
+                else if (timeOfDay === 1) timePeriod = 'Morning';
+                else if (timeOfDay === 2) timePeriod = 'Afternoon';
+                else timePeriod = 'Evening';
+                
+                // Smoke tends to disperse over time unless new fires start
+                const dispersalFactor = Math.max(0.5, 1 - (hour / 100));
+                
+                // Add some daily variation (worse in afternoons)
+                const dailyVariation = timeOfDay === 2 ? 1.2 : 1;
+                
+                // Random variations
+                const randomFactor = 0.8 + (Math.random() * 0.4); // 0.8 to 1.2
+                
+                // Calculate forecast value
+                let forecastValue = baseLevel * dispersalFactor * windFactor * dailyVariation * randomFactor;
+                
+                // Add occasional smoke spikes from new fires
+                if (Math.random() < 0.05) { // 5% chance of spike
+                    forecastValue *= 1.5;
+                }
+                
+                forecast.push({
+                    hour,
+                    time: Day ${day} ${timePeriod},
+                    level: Math.round(forecastValue)
+                });
+            }
+            
+            // Filter to just keep one data point per time period
+            const filteredForecast = [];
+            const timeLabels = [];
+            
+            forecast.forEach(f => {
+                if (!timeLabels.includes(f.time)) {
+                    timeLabels.push(f.time);
+                    filteredForecast.push(f);
+                }
+            });
+            
+            return filteredForecast;
+        }
+        
+        function generateOzoneTrend(baseValue) {
+            const trend = [];
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            
+            // Seasonal pattern for ozone (higher in spring, lower in autumn)
+            const seasonalPattern = [1.05, 1.08, 1.1, 1.12, 1.1, 1.05, 1.0, 0.95, 0.9, 0.92, 0.95, 1.0];
+            
+            // Current month
+            const currentMonth = new Date().getMonth(); // 0-11
+            
+            // Generate data for each month
+            for (let i = 0; i < 12; i++) {
+                const monthIndex = (currentMonth - 11 + i + 12) % 12; // Start 11 months ago
+                
+                const monthFactor = seasonalPattern[monthIndex];
+                const randomVariation = (Math.random() * 20) - 10; // -10 to +10
+                
+                const monthValue = Math.round(baseValue * monthFactor + randomVariation);
+                
+                trend.push({
+                    month: months[monthIndex],
+                    value: monthValue
+                });
+            }
+            
+            return trend;
+        }
+        
+        function generateHealthRecommendations(aqi) {
+            const recommendations = [];
+            
+            // Basic recommendations for everyone
+            recommendations.push('Stay informed about air quality in your area.');
+            recommendations.push('Keep windows closed when air quality is poor.');
+            
+            if (aqi > 50) {
+                recommendations.push('Sensitive individuals should limit prolonged outdoor exertion.');
+            }
+            
+            if (aqi > 100) {
+                recommendations.push('People with respiratory or heart conditions should avoid outdoor activities.');
+                recommendations.push('Consider using air purifiers indoors.');
+            }
+            
+            if (aqi > 150) {
+                recommendations.push('Everyone should reduce prolonged or heavy outdoor exertion.');
+                recommendations.push('Wear N95/KN95 masks outdoors if available.');
+                recommendations.push('Keep medication on hand if you have asthma or other respiratory conditions.');
+            }
+            
+            if (aqi > 200) {
+                recommendations.push('Everyone should avoid all outdoor exertion.');
+                recommendations.push('Create a clean air room in your home.');
+                recommendations.push('Consider temporary relocation if conditions persist.');
+            }
+            
+            if (aqi > 300) {
+                recommendations.push('Stay indoors with windows closed and air purifiers running.');
+                recommendations.push('Evacuate the area if advised by authorities.');
+                recommendations.push('Seek medical attention immediately if experiencing respiratory distress.');
+            }
+            
+            return recommendations;
+        }
+        
+        function formatDateTime(isoString) {
+            const date = new Date(isoString);
+            return date.toLocaleString();
+        }
+        
+        function formatNumber(num) {
+            return new Intl.NumberFormat().format(num);
+        }
+        
+        // Animation functions
+        function animateDataPoints() {
+            anime({
+                targets: '.data-point',
+                translateY: [20, 0],
+                opacity: [0, 1],
+                delay: anime.stagger(100),
+                easing: 'easeOutCubic',
+                duration: 800
+            });
+            
+            anime({
+                targets: '.chart-container',
+                translateY: [30, 0],
+                opacity: [0, 1],
+                delay: anime.stagger(200),
+                easing: 'easeOutCubic',
+                duration: 1000
+            });
+        }
+        
+        // UI status functions
+        function showLoading() {
+            mapLoading.classList.remove('hidden');
+        }
+        
+        function hideLoading() {
+            mapLoading.classList.add('hidden');
+        }
+        
+        function updateStatus(message, color) {
+            statusBadge.textContent = message;
+            statusBadge.classList.remove('hidden', 'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500');
+            
+            if (color === 'red') statusBadge.classList.add('bg-red-500');
+            else if (color === 'blue') statusBadge.classList.add('bg-blue-500');
+            else if (color === 'green') statusBadge.classList.add('bg-green-500');
+            else if (color === 'yellow') statusBadge.classList.add('bg-yellow-500');
+            
+            // Auto hide after 5 seconds
+            setTimeout(() => {
+                statusBadge.classList.add('hidden');
+            }, 5000);
+        }
+        
+        // Report generation
+        function generateReport() {
+            if (!state.currentLocation.name) {
+                updateStatus('Please search for a location first', 'yellow');
+                return;
+            }
+            
+            updateStatus('Generating report...', 'blue');
+            
+            // In a real implementation, this would generate a PDF
+            // For this demo, we'll just show a success message
+            setTimeout(() => {
+                updateStatus('Report generated successfully!', 'green');
+            }, 2000);
+        }
+        
+        // Event listeners
+        function setupEventListeners() {
+            // Theme toggle
+            themeToggle.addEventListener('click', toggleTheme);
+            themeToggleDesktop.addEventListener('click', toggleTheme);
+            
+            // Search
+            searchButton.addEventListener('click', () => {
+                searchLocation(searchInput.value);
+            });
+            
+            searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    searchLocation(searchInput.value);
+                }
+            });
+            
+            // Hide search results when clicking elsewhere
+            document.addEventListener('click', (e) => {
+                if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+                    searchResults.classList.add('hidden');
+                }
+            });
+            
+            // Function buttons
+            wildfireBtn.addEventListener('click', () => {
+                state.activeView = 'wildfire';
+                updateActiveView();
+            });
+            
+            airQualityBtn.addEventListener('click', () => {
+                state.activeView = 'airQuality';
+                updateActiveView();
+            });
+            
+            smokePredictionBtn.addEventListener('click', () => {
+                state.activeView = 'smokePrediction';
+                updateActiveView();
+            });
+            
+            populationBtn.addEventListener('click', () => {
+                state.activeView = 'population';
+                updateActiveView();
+            });
+            
+            // Report generation
+            generateReportBtn.addEventListener('click', generateReport);
+        }
+        
+        function updateActiveView() {
+            // Clear existing markers
+            clearMarkers();
+            
+            // Update current view label
+            const currentViewLabel = document.getElementById('current-view-label');
+            
+            // Reset all buttons to default state
+            const buttons = [wildfireBtn, airQualityBtn, smokePredictionBtn, populationBtn];
+            buttons.forEach(btn => {
+                btn.classList.remove('ring-4', 'ring-white', 'ring-opacity-50');
+            });
+            
+            // Apply active state to selected button
+            switch (state.activeView) {
+                case 'wildfire':
+                    currentViewLabel.textContent = '- Wildfire Data';
+                    wildfireBtn.classList.add('ring-4', 'ring-white', 'ring-opacity-50');
+                    if (state.data.wildfires) addWildfireMarkers();
+                    break;
+                case 'airQuality':
+                    currentViewLabel.textContent = '- Air Quality Data';
+                    airQualityBtn.classList.add('ring-4', 'ring-white', 'ring-opacity-50');
+                    if (state.data.airQuality) addAirQualityMarkers();
+                    break;
+                case 'smokePrediction':
+                    currentViewLabel.textContent = '- Smoke Prediction';
+                    smokePredictionBtn.classList.add('ring-4', 'ring-white', 'ring-opacity-50');
+                    // Smoke prediction view would typically show smoke forecast overlay
+                    break;
+                case 'population':
+                    currentViewLabel.textContent = '- Population Impact';
+                    populationBtn.classList.add('ring-4', 'ring-white', 'ring-opacity-50');
+                    // Population impact view would show population density overlay
+                    break;
+            }
+        }
+        
+        // Initialize the application
+        function initApp() {
+            initMap();
+            setupEventListeners();
+            
+            // Set initial state
+            document.body.classList.add(state.theme);
+            state.activeView = 'wildfire';
+            
+            // Initial UI state
+            generateReportBtn.disabled = true;
+            updateStatus('Welcome! Search for a location to get started.', 'blue');
+            
+            // Initial active view
+            updateActiveView();
+        }
+        
+        // Start the app once DOM is loaded
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
