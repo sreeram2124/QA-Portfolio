@@ -1,39 +1,62 @@
-# Test Cases for BizTrack-OMS Project
+Test Cases for FireCast – Wildfire & Air Quality Monitor
+Test Case 1: Location Search Functionality
 
-## Test Case 1: Product Search Functionality
-- **Test Steps**: 
-  1. Navigate to search page
-  2. Enter product name "Laptop"
-  3. Click search button
-- **Expected**: Shows products containing "Laptop"
-- **Status**: ✅ PASS
+Test Steps:
 
-## Test Case 2: Order Creation
-- **Test Steps**:
-  1. Go to Orders section
-  2. Click "Create New Order"
-  3. Fill required fields
-  4. Submit form
-- **Expected**: Order appears in orders list
-- **Status**: ✅ PASS
+Open the application
 
-## Test Case 3: Database Connection
-- **Test Steps**:
-  1. Start application
-  2. Check console logs
-- **Expected**: "Database connected successfully"
-- **Status**: ✅ PASS
+Enter a valid location name (e.g., "Delhi") in the search bar
 
-## Test Case 4: User Login
-- **Test Steps**:
-  1. Enter valid credentials
-  2. Click login
-- **Expected**: Redirect to dashboard
-- **Status**: ✅ PASS
+Click the search button
 
-## Test Case 5: Error Handling
-- **Test Steps**:
-  1. Enter invalid search query
-  2. Submit form
-- **Expected**: Show "No results found" message
-- **Status**: ✅ PASS
+Expected: Map zooms to that location and displays wildfire, AQI, and smoke data
+
+Status: ✅ PASS
+
+Test Case 2: Wildfire Marker Display
+
+Test Steps:
+
+Search any valid city
+
+Click the "Wildfires" button
+
+Expected: Red wildfire markers appear on the map and nearest fires list updates
+
+Status: ✅ PASS
+
+Test Case 3: AQI Data Card Rendering
+
+Test Steps:
+
+Search a city
+
+Observe the AQI panel
+
+Expected: AQI value, category, and pollutant breakdown (PM2.5, PM10, CO, NO2, etc.) display correctly
+
+Status: ✅ PASS
+
+Test Case 4: Smoke Forecast Chart Loading
+
+Test Steps:
+
+Search a city
+
+Scroll to “Smoke Forecast (72 hours)” chart
+
+Expected: Bar chart loads with 72-hour smoke prediction values
+
+Status: ✅ PASS
+
+Test Case 5: PDF Report Generation
+
+Test Steps:
+
+Search any location
+
+Click “Generate PDF Report” button
+
+Expected: PDF downloads successfully with AQI, wildfire, smoke, ozone and population data
+
+Status: ✅ PASS
